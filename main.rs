@@ -1,5 +1,5 @@
 use std::time::Instant;
-
+use rayon::prelude::*
 
 pub struct Matrix {
     rows: i32,
@@ -40,7 +40,7 @@ impl Matrix {
                 println!("\n");
             }
         }
- }
+    }
     
     pub fn set_val (&mut self, row_ind: i32, col_ind: i32, value: f32) -> Result<(), &'static str> {
         if row_ind > self.rows || col_ind > self.columns || row_ind < 0 || col_ind < 0 {
@@ -80,6 +80,7 @@ impl Matrix {
 
     } */
 
+    // Cache friendly accessing
     /* pub fn dot (&self, other: &Matrix) -> Matrix {
         assert!(self.columns == other.rows);
         let mut result: Matrix = Matrix::new(self.rows, other.columns);
@@ -97,6 +98,8 @@ impl Matrix {
         result
 
     } */
+     
+    // Column tiling
 
     /* pub fn dot (&self, other: &Matrix) -> Matrix {
         assert!(self.columns == other.rows);
@@ -125,22 +128,23 @@ impl Matrix {
     pub fn dot (&self, other: &Matrix) -> Matrix {
         assert!(self.columns == other.rows);
         let mut result: Matrix = Matrix::new(self.rows, other.columns);
-        let tileSize: i32 = 16;
+        let tileSize: i32 = 256;
         for row_tiles_start in (0..self.rows).step_by(tileSize as usize) {
-            let row_tiles_end = row_tiles_start + tileSize;
-            
-            for col_tiles_start in (0..self.columns).step_by(tileSize as usize) {
 
-                let col_tiles_end = col_tiles_start + tileSize;
-                for row in row_tiles_start..row_tiles_end {
+            for col_tiles_start in (0..other.columns).step_by(tileSize as usize) {
 
-                    for ind in col_tiles_start..col_tiles_end {
+                for inner_tiles_start in (0..self.columns).step_by(tileSize as usize) {
 
-                        for col in 0..other.columns{
-                            let index_self = (row * self.columns + ind) as usize;
-                            let index_other = (ind * other.columns + col) as usize;
-                            result.values[(row * other.columns + col) as usize] += self.values[index_self] * other.values[index_other];
+                    for row in row_tiles_start..(row_tiles_start + tileSize) {
 
+                        for inner in inner_tiles_start..(inner_tiles_start + tileSize) {
+
+                            for col in col_tiles_start..(col_tiles_start + tileSize){
+                                let index_self = (row * self.columns + inner) as usize;
+                                let index_other = (inner * other.columns + col) as usize;
+                                result.values[(row * other.columns + col) as usize] += self.values[index_self] * other.values[index_other];
+
+                            }
                         }
                     }
                 }
@@ -174,6 +178,5 @@ fn main() {
     // No optimizations takes: 1.42s
     // Reordering loops takes: 93.28ms
     // Column tiling takes: 80.87ms
-    // Row tiling takes: 5.2ms
 
 }
