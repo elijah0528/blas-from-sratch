@@ -1,5 +1,6 @@
 use std::time::Instant;
-use rayon::prelude::*
+use rayon::prelude::*;
+use std::sync::Mutex;
 
 pub struct Matrix {
     rows: i32,
@@ -128,9 +129,10 @@ impl Matrix {
     pub fn dot (&self, other: &Matrix) -> Matrix {
         assert!(self.columns == other.rows);
         let mut result: Matrix = Matrix::new(self.rows, other.columns);
+        let result_values_mutex = Mutex::new(result.values);
         let tileSize: i32 = 256;
-        for row_tiles_start in (0..self.rows).step_by(tileSize as usize) {
-
+        (0..self.rows).into_par_iter().step_by(tileSize as usize).for_each( |row_tiles_start| {
+            let mut partial_res = vec![0.0; (self.rows * other.columns) as usize];
             for col_tiles_start in (0..other.columns).step_by(tileSize as usize) {
 
                 for inner_tiles_start in (0..self.columns).step_by(tileSize as usize) {
@@ -142,16 +144,64 @@ impl Matrix {
                             for col in col_tiles_start..(col_tiles_start + tileSize){
                                 let index_self = (row * self.columns + inner) as usize;
                                 let index_other = (inner * other.columns + col) as usize;
-                                result.values[(row * other.columns + col) as usize] += self.values[index_self] * other.values[index_other];
+                                partial_res[(row * other.columns + col) as usize] += self.values[index_self] * other.values[index_other];
 
                             }
                         }
                     }
                 }
             }
-        }
-        result
+            let mut result_values = result_values_mutex.lock().unwrap();
+            for (i, &value) in partial_res.iter().enumerate() {
+                result_values[i] += value;
+            }
 
+        });
+        {
+            let computed_values = result_values_mutex.lock().unwrap();
+            result.set_all(&computed_values);
+        }
+
+        result
+        
+
+    }
+
+    fn dot(&self, other: &Matrix) -> Matrix {
+        assert_eq!(self.columns, other.rows);
+        let mut result = Matrix::new(self.rows, other.columns);
+        let result_values_mutex = Mutex::new(vec![0.0; (self.rows * other.columns) as usize]);
+        let tileSize: i32 = 256;
+
+        (0..self.rows).into_par_iter().step_by(tileSize as usize).for_each(|row_tiles_start| {
+            let mut partial_res = vec![0.0; (self.rows * other.columns) as usize];
+            for col_tiles_start in (0..other.columns).step_by(tileSize as usize) {
+                for inner_tiles_start in (0..self.columns).step_by(tileSize as usize) {
+                    for row in row_tiles_start..(row_tiles_start + tileSize) {
+
+                        for inner in inner_tiles_start..(inner_tiles_start + tileSize) {
+
+                            for col in col_tiles_start..(col_tiles_start + tileSize){
+                                let index_self = (row * self.columns + inner) as usize;
+                                let index_other = (inner * other.columns + col) as usize;
+                                partial_res[(row * other.columns + col) as usize] += self.values[index_self] * other.values[index_other];
+                            }
+                        }
+                    }
+                }
+            }
+            let mut result_values = result_values_mutex.lock().unwrap();
+            for (i, &value) in partial_res.iter().enumerate() {
+                result_values[i] += value;
+            }
+        });
+
+        {
+            let computed_values = result_values_mutex.lock().unwrap();
+            result.set_all(&computed_values);
+        }
+
+        result
     }
     
 }
