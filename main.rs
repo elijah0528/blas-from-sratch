@@ -2,6 +2,7 @@ use std::time::Instant;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
+// 🧮 Matrix implementation for BLAS operations
 pub struct Matrix {
     rows: i32,
     columns: i32,
@@ -220,10 +221,10 @@ fn main() {
     let my_mat3 = my_mat.dot(&my_mat2);
     let elapsed = now.elapsed();
 
-    println!("Printing matrix");
+    println!("📊 Printing matrix");
     my_mat3.print_all_val();
 
-    println!("Elapsed: {:.2?}", elapsed);
+    println!("⏱️ Elapsed: {:.2?}", elapsed);
 
     // No optimizations takes: 1.42s
     // Reordering loops takes: 93.28ms
